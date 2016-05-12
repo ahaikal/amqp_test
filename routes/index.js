@@ -4,13 +4,13 @@ var amqp = require('amqplib');
 var when = require('when');
 var syslogParser = require('glossy').Parse;
 var broker = {
-    host: 'localhost',
+    host: process.env.AMQP_URL,
     port: 5672,
-    login: 'guest',
-    password: 'guest',
+    login: process.env.AMQP_USERNAME,
+    password: process.env.AMQP_PASSWORD,,
     connectionTimeout: 10000,
     authMechanism: 'AMQPLAIN',
-    vhost: 'alan-test',
+    vhost: process.env.AMQP_VHOST,
     noDelay: true,
     ssl: {
         enabled: false
@@ -40,7 +40,7 @@ var logplexMiddleware = [
 router.post('/', logplexMiddleware, function(req, res, next) {
     amqp.connect(broker).then(function(conn) {
         return when(conn.createChannel().then(function(ch) {
-            var q = 'yy';
+            var q = 'node-test';
             var msg = req.body;
             var ok = ch.assertQueue(q, { durable: false });
 
@@ -51,7 +51,7 @@ router.post('/', logplexMiddleware, function(req, res, next) {
                 // to fire before writing again. We're just doing the one write,
                 // so we'll ignore it.
                 msg.forEach(function(item) {
-                    console.log(item.originalMessage);
+                    // console.log(item.originalMessage);
                     ch.sendToQueue(q, new Buffer(item.originalMessage));
 
                 });
