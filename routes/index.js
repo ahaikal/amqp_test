@@ -3,19 +3,19 @@ var router = express.Router();
 var amqp = require('amqplib');
 var when = require('when');
 var syslogParser = require('glossy').Parse;
-var broker = {
-    host: process.env.AMQP_URL,
-    port: 5672,
-    login: process.env.AMQP_USERNAME,
-    password: process.env.AMQP_PASSWORD,,
-    connectionTimeout: 10000,
-    authMechanism: 'AMQPLAIN',
-    vhost: process.env.AMQP_VHOST,
-    noDelay: true,
-    ssl: {
-        enabled: false
-    }
-}
+// var broker = {
+//     host: process.env.AMQP_URL,
+//     port: 5672,
+//     login: encodeURIComponent(process.env.AMQP_USERNAME),
+//     password: encodeURIComponent(process.env.AMQP_PASSWORD),
+//     connectionTimeout: 10000,
+//     authMechanism: 'AMQPLAIN',
+//     vhost: process.env.AMQP_VHOST,
+//     noDelay: true,
+//     ssl: {
+//         enabled: false
+//     }
+// }
 var logplexMiddleware = [
     // First, read the message body into `req.body`, making sure it only
     // accepts logplex "documents".
@@ -34,31 +34,24 @@ var logplexMiddleware = [
         next();
     }
 ];
-
+var url = 'amqp://' + process.env.AMQP_USERNAME + ':' + process.env.AMQP_PASSWORD + '@' +process.env.AMQP_URL + '/' + process.env.AMQP_VHOST
+console.log(url)
+var open = require('amqplib').connect(url);
 
 /* GET home page. */
 router.post('/', logplexMiddleware, function(req, res, next) {
-    amqp.connect(broker).then(function(conn) {
-        return when(conn.createChannel().then(function(ch) {
-            var q = 'node-test';
-            var msg = req.body;
-            var ok = ch.assertQueue(q, { durable: false });
-
-            return ok.then(function(_qok) {
-                // NB: `sentToQueue` and `publish` both return a boolean
-                // indicating whether it's OK to send again straight away, or
-                // (when `false`) that you should wait for the event `'drain'`
-                // to fire before writing again. We're just doing the one write,
-                // so we'll ignore it.
-                msg.forEach(function(item) {
-                    // console.log(item.originalMessage);
-                    ch.sendToQueue(q, new Buffer(item.originalMessage));
-
-                });
-                return ch.close();
+    var q = 'node-test';
+    var msg = req.body;
+    open.then(function(conn) {
+        return conn.createChannel();
+    }).then(function(ch) {
+        return ch.assertQueue(q).then(function(ok) {
+            msg.forEach(function(item) {
+                // console.log(item.originalMessage);
+                return ch.sendToQueue(q, new Buffer(item.originalMessage));
             });
-        })).ensure(function() { conn.close(); });
-    }).then(null, console.warn);
+        });
+    }).catch(console.warn);
     res.sendStatus(200)
 });
 
